@@ -15,6 +15,8 @@ import {
     refine_question_template,
     refine_template
 } from './prompts'
+import {VectorStore, VectorStoreRetriever} from "langchain/dist/vectorstores/base";
+import {Callbacks} from "langchain/callbacks";
 
 class ConversationalRetrievalQAChain_Chains implements INode {
     label: string
@@ -160,6 +162,29 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             if (chainOption === 'refine') fields.outputKey = 'output_text'
             obj.memory = new BufferMemory(fields)
         }
+
+        //CUSTOM EDIT: copy the score to the ouput, as a field in metaData
+        let vs = vectorStoreRetriever as VectorStoreRetriever;
+        (vs.vectorStore as VectorStore).similaritySearch = async function(query: string,
+              k = 4,
+              filter: any | undefined = undefined,
+              _callbacks: Callbacks | undefined = undefined // implement passing to embedQuery later
+        ): Promise<any[]>{
+                const results = await this.similaritySearchVectorWithScore(
+                    await this.embeddings.embedQuery(query),
+                    k,
+                    filter
+                );
+
+            return results.map((result) => {
+                let doc = result[0];
+                if(doc.metadata)
+                    doc.metadata['score'] = result[1];
+                return doc;
+            });
+        }
+
+
 
         const chain = ConversationalRetrievalQAChain.fromLLM(model, vectorStoreRetriever, obj)
         return chain
