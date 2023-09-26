@@ -15,9 +15,11 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN npm install -g husky
 
-# You can install a specific version like: flowise@1.0.0
-RUN npm install -g git+https://github.com/rihadavid/Flowise.FutureBot.git
-
+# Create and change to working directory
 WORKDIR /data
 
-CMD "flowise"
+# Install flowise locally in /data
+RUN npm install git+https://github.com/rihadavid/Flowise.FutureBot.git
+
+# Command to execute
+CMD ["/data/node_modules/.bin/flowise"]
