@@ -15,8 +15,10 @@ import {
     refine_question_template,
     refine_template
 } from './prompts'
-import {VectorStore, VectorStoreRetriever} from "langchain/dist/vectorstores/base";
-import {Callbacks} from "langchain/callbacks";
+import { VectorStore, VectorStoreRetriever } from 'langchain/dist/vectorstores/base'
+import { Callbacks } from 'langchain/callbacks'
+
+import axios from 'axios'
 
 class ConversationalRetrievalQAChain_Chains implements INode {
     label: string
@@ -164,27 +166,21 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         }
 
         //CUSTOM EDIT: copy the score to the ouput, as a field in metaData
-        let vs = vectorStoreRetriever as VectorStoreRetriever;
-        (vs.vectorStore as VectorStore).similaritySearch = async function(query: string,
-              k = 4,
-              filter: any | undefined = undefined,
-              _callbacks: Callbacks | undefined = undefined // implement passing to embedQuery later
-        ): Promise<any[]>{
-                const results = await this.similaritySearchVectorWithScore(
-                    await this.embeddings.embedQuery(query),
-                    k,
-                    filter
-                );
+        let vs = vectorStoreRetriever as VectorStoreRetriever
+        ;(vs.vectorStore as VectorStore).similaritySearch = async function (
+            query: string,
+            k = 4,
+            filter: any | undefined = undefined,
+            _callbacks: Callbacks | undefined = undefined // implement passing to embedQuery later
+        ): Promise<any[]> {
+            const results = await this.similaritySearchVectorWithScore(await this.embeddings.embedQuery(query), k, filter)
 
             return results.map((result) => {
-                let doc = result[0];
-                if(doc.metadata)
-                    doc.metadata['score'] = result[1];
-                return doc;
-            });
+                let doc = result[0]
+                if (doc.metadata) doc.metadata['score'] = result[1]
+                return doc
+            })
         }
-
-
 
         const chain = ConversationalRetrievalQAChain.fromLLM(model, vectorStoreRetriever, obj)
         return chain
@@ -210,24 +206,62 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
 
         if (options.socketIO && options.socketIOClientId) {
+            let saveMessagePromise
+
+            try {
+                saveMessagePromise = axios.post('https://futurebot.ai/wp-json/flowise/v1/save_flowise_message/', {
+                    userId: nodeData.inputs?.pineconeNamespace,
+                    sessionId: options.socketIOClientId,
+                    message: input,
+                    isBot: false
+                })
+            } catch (e) {
+                console.error(e)
+            }
+
             const handler = new CustomChainHandler(
                 options.socketIO,
                 options.socketIOClientId,
                 chainOption === 'refine' ? 4 : undefined,
                 returnSourceDocuments
             )
+
+            let chatbotMessage
+            let resultObj
+
             const res = await chain.call(obj, [loggerHandler, handler])
             if (chainOption === 'refine') {
+                chatbotMessage = res?.output_text
                 if (res.output_text && res.sourceDocuments) {
-                    return {
+                    resultObj = {
                         text: res.output_text,
                         sourceDocuments: res.sourceDocuments
                     }
-                }
-                return res?.output_text
+                } else resultObj = res?.output_text
+            } else {
+                chatbotMessage = res?.text
+                if (res.text && res.sourceDocuments) resultObj = res
+                else resultObj = res?.text
             }
-            if (res.text && res.sourceDocuments) return res
-            return res?.text
+
+            try {
+                await saveMessagePromise
+            } catch (e) {
+                console.error(e)
+            }
+
+            try {
+                await axios.post('https://futurebot.ai/wp-json/flowise/v1/save_flowise_message/', {
+                    userId: nodeData.inputs?.pineconeNamespace,
+                    sessionId: options.socketIOClientId,
+                    message: chatbotMessage,
+                    isBot: true
+                })
+            } catch (e) {
+                console.error(e)
+            }
+
+            return resultObj
         } else {
             const res = await chain.call(obj, [loggerHandler])
             if (res.text && res.sourceDocuments) return res
