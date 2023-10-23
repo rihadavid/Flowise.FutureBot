@@ -54,6 +54,7 @@ import { Credential } from './entity/Credential'
 import { Tool } from './entity/Tool'
 import { ChatflowPool } from './ChatflowPool'
 import { ICommonObject, INodeOptionsValue } from 'flowise-components'
+import axios from 'axios'
 
 export class App {
     app: express.Application
@@ -844,6 +845,16 @@ export class App {
             const parsedFlowData: IReactFlowObject = JSON.parse(flowData)
             const nodes = parsedFlowData.nodes
             const edges = parsedFlowData.edges
+
+            let canProceed =
+                incomingInput.overrideConfig &&
+                (
+                    await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
+                        userId: incomingInput.overrideConfig.pineconeNamespace
+                    })
+                ).data.status
+
+            if (!canProceed) return res.status(403).send(`Chatbot permission check failed. Chatbot owner is being rate limited.`)
 
             /*   Reuse the flow without having to rebuild (to avoid duplicated upsert, recomputation) when all these conditions met:
              * - Node Data already exists in pool
