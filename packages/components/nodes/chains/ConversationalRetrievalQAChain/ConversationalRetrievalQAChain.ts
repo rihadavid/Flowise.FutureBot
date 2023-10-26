@@ -211,7 +211,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             try {
                 saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
                     userId: nodeData.inputs?.pineconeNamespace,
-                    sessionId: options.socketIOClientId,
+                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
                     message: input,
                     isBot: false
                 })
@@ -253,7 +253,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             try {
                 await axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
                     userId: nodeData.inputs?.pineconeNamespace,
-                    sessionId: options.socketIOClientId,
+                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
                     message: chatbotMessage,
                     isBot: true
                 })

@@ -854,7 +854,10 @@ export class App {
                     })
                 ).data.status
 
-            if (!canProceed) return res.status(403).send(`Chatbot permission check failed. Chatbot owner is being rate limited.`)
+            if (!canProceed)
+                return res
+                    .status(403)
+                    .send(`Byl dosažen limit požadavků, je vyžadován vlastní chatGPT API klíč. Upozorněte provozovatele této stránky.`)
 
             /*   Reuse the flow without having to rebuild (to avoid duplicated upsert, recomputation) when all these conditions met:
              * - Node Data already exists in pool
