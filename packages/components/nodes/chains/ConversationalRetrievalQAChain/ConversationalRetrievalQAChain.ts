@@ -205,9 +205,11 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
 
-        if (options.socketIO && options.socketIOClientId) {
-            let saveMessagePromise
+        let saveMessagePromise
+        let resultObj
+        let chatbotMessage
 
+        if (options.socketIO && options.socketIOClientId) {
             try {
                 saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
                     userId: nodeData.inputs?.pineconeNamespace,
@@ -225,9 +227,6 @@ class ConversationalRetrievalQAChain_Chains implements INode {
                 chainOption === 'refine' ? 4 : undefined,
                 returnSourceDocuments
             )
-
-            let chatbotMessage
-            let resultObj
 
             const res = await chain.call(obj, [loggerHandler, handler])
             if (chainOption === 'refine') {
@@ -263,9 +262,44 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 
             return resultObj
         } else {
+            try {
+                saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
+                    userId: nodeData.inputs?.pineconeNamespace,
+                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
+                    message: input,
+                    isBot: false
+                })
+            } catch (e) {
+                console.error(e)
+            }
+
             const res = await chain.call(obj, [loggerHandler])
-            if (res.text && res.sourceDocuments) return res
-            return res?.text
+
+            try {
+                await saveMessagePromise
+            } catch (e) {
+                console.error(e)
+            }
+
+            if (res.text && res.sourceDocuments) resultObj = res
+            else resultObj = res?.text
+
+            chatbotMessage = res?.text
+
+            if (chatbotMessage) {
+                try {
+                    await axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
+                        userId: nodeData.inputs?.pineconeNamespace,
+                        sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
+                        message: chatbotMessage,
+                        isBot: true
+                    })
+                } catch (e) {
+                    console.error(e)
+                }
+            }
+
+            return resultObj
         }
     }
 }
