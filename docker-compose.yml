@@ -6,8 +6,8 @@ services:
             context: .
             dockerfile: Dockerfile
         environment:
-            FLOWISE_USERNAME: 'my.clone.gpt'
-            FLOWISE_PASSWORD: 'futurebot.ai'
+            FLOWISE_USERNAME: ${FLOWISE_USERNAME}
+            FLOWISE_PASSWORD: ${FLOWISE_PASSWORD}
             APIKEY_PATH: '/root/.flowise'
             SECRETKEY_PATH: '/root/.flowise'
             DATABASE_PATH: '/root/.flowise'
