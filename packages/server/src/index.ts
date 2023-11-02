@@ -964,13 +964,15 @@ export class App {
                       socketIOClientId: incomingInput.socketIOClientId,
                       logger,
                       appDataSource: this.AppDataSource,
-                      databaseEntities
+                      databaseEntities,
+                      chatId: incomingInput.chatId
                   })
                 : await nodeInstance.run(nodeToExecuteData, incomingInput.question, {
                       chatHistory: incomingInput.history,
                       logger,
                       appDataSource: this.AppDataSource,
-                      databaseEntities
+                      databaseEntities,
+                      chatId: incomingInput.chatId
                   })
 
             logger.debug(`[server]: Finished running ${nodeToExecuteData.label} (${nodeToExecuteData.id})`)
