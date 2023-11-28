@@ -837,7 +837,7 @@ export class App {
     async chatCompletion(messages: OpenAIMessage[], temperature: number): Promise<any> {
         const config: AxiosRequestConfig = {}
         config.headers = {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            Authorization: `Bearer ${(process.env.OPENAI_API_KEY as string).trim()}`
         }
         return await axios.post(
             'https://api.openai.com/v1/chat/completions',
@@ -859,6 +859,7 @@ export class App {
      */
     async processPrediction(req: Request, res: Response, socketIO?: Server, isInternal = false) {
         try {
+            logger.info('processPrediction 1')
             let chatflowid = req.params.id
             let incomingInput: IncomingInput = req.body
 
@@ -874,7 +875,7 @@ export class App {
                         incomingInput.overrideConfig.databaseDescription
                     ))
                 )
-                    chatflowid = process.env.BASIC_CHAT_GPT as string //switch to conversation without vector database data
+                    chatflowid = (process.env.BASIC_CHAT_GPT as string).trim() //switch to conversation without vector database data
 
             const chatflow = await this.AppDataSource.getRepository(ChatFlow).findOneBy({
                 id: chatflowid
