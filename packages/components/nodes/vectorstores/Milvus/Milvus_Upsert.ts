@@ -1,5 +1,5 @@
 import { ICommonObject, INode, INodeData, INodeOutputsValue, INodeParams } from '../../../src/Interface'
-import { DataType, ErrorCode, MetricType, IndexType } from '@zilliz/milvus2-sdk-node'
+import { DataType, ErrorCode } from '@zilliz/milvus2-sdk-node'
 import { MilvusLibArgs, Milvus } from 'langchain/vectorstores/milvus'
 import { Embeddings } from 'langchain/embeddings/base'
 import { Document } from 'langchain/document'
@@ -252,7 +252,7 @@ class MilvusUpsert extends Milvus {
             collection_name: this.collectionName
         })
 
-        if (descIndexResp.status.error_code === ErrorCode.INDEX_NOT_EXIST) {
+        /*if (descIndexResp.status.error_code === ErrorCode.INDEX_NOT_EXIST) {
             const resp = await this.client.createIndex({
                 collection_name: this.collectionName,
                 field_name: this.vectorField,
@@ -263,7 +263,7 @@ class MilvusUpsert extends Milvus {
             if (resp.error_code !== ErrorCode.SUCCESS) {
                 throw new Error(`Error creating index`)
             }
-        }
+        }*/
 
         const insertResp = await this.client.insert({
             collection_name: this.collectionName,
