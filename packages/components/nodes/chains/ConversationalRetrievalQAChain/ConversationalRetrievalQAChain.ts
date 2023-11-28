@@ -18,8 +18,6 @@ import {
 import { VectorStore, VectorStoreRetriever } from 'langchain/dist/vectorstores/base'
 import { Callbacks } from 'langchain/callbacks'
 
-import axios from 'axios'
-
 class ConversationalRetrievalQAChain_Chains implements INode {
     label: string
     name: string
@@ -205,22 +203,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 
         const loggerHandler = new ConsoleCallbackHandler(options.logger)
 
-        let saveMessagePromise
-        let resultObj
-        let chatbotMessage
-
         if (options.socketIO && options.socketIOClientId) {
-            try {
-                saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
-                    userId: nodeData.inputs?.pineconeNamespace,
-                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
-                    message: input,
-                    isBot: false
-                })
-            } catch (e) {
-                console.error(e)
-            }
-
             const handler = new CustomChainHandler(
                 options.socketIO,
                 options.socketIOClientId,
@@ -230,76 +213,21 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 
             const res = await chain.call(obj, [loggerHandler, handler])
             if (chainOption === 'refine') {
-                chatbotMessage = res?.output_text
                 if (res.output_text && res.sourceDocuments) {
-                    resultObj = {
+                    return {
                         text: res.output_text,
                         sourceDocuments: res.sourceDocuments
                     }
-                } else resultObj = res?.output_text
+                } else return res?.output_text
             } else {
-                chatbotMessage = res?.text
-                if (res.text && res.sourceDocuments) resultObj = res
-                else resultObj = res?.text
+                if (res.text && res.sourceDocuments) return res
+                return res?.text
             }
-
-            try {
-                await saveMessagePromise
-            } catch (e) {
-                console.error(e)
-            }
-
-            try {
-                await axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
-                    userId: nodeData.inputs?.pineconeNamespace,
-                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
-                    message: chatbotMessage,
-                    isBot: true
-                })
-            } catch (e) {
-                console.error(e)
-            }
-
-            return resultObj
         } else {
-            try {
-                saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
-                    userId: nodeData.inputs?.pineconeNamespace,
-                    sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
-                    message: input,
-                    isBot: false
-                })
-            } catch (e) {
-                console.error(e)
-            }
-
             const res = await chain.call(obj, [loggerHandler])
 
-            try {
-                await saveMessagePromise
-            } catch (e) {
-                console.error(e)
-            }
-
-            if (res.text && res.sourceDocuments) resultObj = res
-            else resultObj = res?.text
-
-            chatbotMessage = res?.text
-
-            if (chatbotMessage) {
-                try {
-                    await axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
-                        userId: nodeData.inputs?.pineconeNamespace,
-                        sessionId: !options.chatId ? options.socketIOClientId : options.chatId,
-                        message: chatbotMessage,
-                        isBot: true
-                    })
-                } catch (e) {
-                    console.error(e)
-                }
-            }
-
-            return resultObj
+            if (res.text && res.sourceDocuments) return res
+            return res?.text
         }
     }
 }

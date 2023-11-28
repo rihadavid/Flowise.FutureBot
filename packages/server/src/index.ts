@@ -54,7 +54,17 @@ import { Credential } from './entity/Credential'
 import { Tool } from './entity/Tool'
 import { ChatflowPool } from './ChatflowPool'
 import { ICommonObject, INodeOptionsValue } from 'flowise-components'
-import axios from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
+
+interface Message {
+    message: string
+    type?: string
+}
+
+interface OpenAIMessage {
+    role: string
+    content: string
+}
 
 export class App {
     app: express.Application
@@ -789,6 +799,57 @@ export class App {
         }
     }
 
+    async shouldQueryPinecone(messageHistory: Message[], message: string, vectorDbDescription: string): Promise<boolean> {
+        let convertedHistory: OpenAIMessage[] = messageHistory.map((m: Message): OpenAIMessage => {
+            return { role: m.type === 'apiMessage' ? 'assistant' : 'user', content: m.message }
+        })
+
+        let prompt =
+            "Always answer only a single word: YES or NO. I want you to decide, if the last message is only conversational (NO) or if it's something, that might be" +
+            'relevant to the vector database content (YES). The vector database can contain know-how and knowledge of various topics. I am talking to you as if you are the creator of the knowledge.' +
+            "If the question is asking info about you, say YES. If it's small talk, greeting or thanking, say NO." +
+            "If the message wants to explain something, say YES. If it's a specific question, say YES."
+
+        if (vectorDbDescription && vectorDbDescription.length > 0) {
+            prompt +=
+                '\n' +
+                'The vector database content description:' +
+                '\n' +
+                vectorDbDescription +
+                '\n' +
+                'End of database content description. Would you recommend to query the vector database for possible relevant content?'
+        }
+
+        let messages: OpenAIMessage[] = [
+            {
+                role: 'system',
+                content: prompt
+            }
+        ]
+
+        let response = await this.chatCompletion(
+            messages.concat(convertedHistory.slice(-3)).concat([{ role: 'user', content: message }]),
+            0
+        )
+        return response.data.choices[0].message.content.toLowerCase() === 'yes'
+    }
+
+    async chatCompletion(messages: OpenAIMessage[], temperature: number): Promise<any> {
+        const config: AxiosRequestConfig = {}
+        config.headers = {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+        }
+        return await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                model: 'gpt-4-1106-preview',
+                messages: messages,
+                temperature: temperature
+            },
+            config
+        )
+    }
+
     /**
      * Process Prediction
      * @param {Request} req
@@ -798,10 +859,22 @@ export class App {
      */
     async processPrediction(req: Request, res: Response, socketIO?: Server, isInternal = false) {
         try {
-            const chatflowid = req.params.id
+            let chatflowid = req.params.id
             let incomingInput: IncomingInput = req.body
 
             let nodeToExecuteData: INodeData
+
+            const isMyCloneGPT = chatflowid === 'e2447fff-842f-4584-8eea-e983d5d9e663'
+
+            if (isMyCloneGPT && incomingInput.overrideConfig)
+                if (
+                    !(await this.shouldQueryPinecone(
+                        incomingInput.history,
+                        incomingInput.question,
+                        incomingInput.overrideConfig.databaseDescription
+                    ))
+                )
+                    chatflowid = process.env.BASIC_CHAT_GPT as string //switch to conversation without vector database data
 
             const chatflow = await this.AppDataSource.getRepository(ChatFlow).findOneBy({
                 id: chatflowid
@@ -847,12 +920,14 @@ export class App {
             const edges = parsedFlowData.edges
 
             let canProceed =
-                incomingInput.overrideConfig &&
-                (
-                    await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
-                        userId: incomingInput.overrideConfig.pineconeNamespace
-                    })
-                ).data.status
+                process.env.ISLOCAL ||
+                !isMyCloneGPT ||
+                (incomingInput.overrideConfig &&
+                    (
+                        await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
+                            userId: incomingInput.overrideConfig.pineconeNamespace
+                        })
+                    ).data.status)
 
             if (!canProceed)
                 return res
@@ -957,6 +1032,20 @@ export class App {
 
             if (nodeToExecuteData.instance) checkMemorySessionId(nodeToExecuteData.instance, chatId)
 
+            let saveMessagePromise
+            if (!process.env.ISLOCAL && isMyCloneGPT && incomingInput.overrideConfig) {
+                try {
+                    saveMessagePromise = axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
+                        userId: incomingInput.overrideConfig.pineconeNamespace,
+                        sessionId: !incomingInput.chatId ? incomingInput.socketIOClientId : incomingInput.chatId,
+                        message: incomingInput.question,
+                        isBot: false
+                    })
+                } catch (e) {
+                    console.error(e)
+                }
+            }
+
             const result = isStreamValid
                 ? await nodeInstance.run(nodeToExecuteData, incomingInput.question, {
                       chatHistory: incomingInput.history,
@@ -974,6 +1063,25 @@ export class App {
                       databaseEntities,
                       chatId: incomingInput.chatId
                   })
+
+            if (!process.env.ISLOCAL && isMyCloneGPT && incomingInput.overrideConfig) {
+                try {
+                    await axios.post('https://futurebot.ai/api/flowise/v1/save_flowise_message/', {
+                        userId: incomingInput.overrideConfig.pineconeNamespace,
+                        sessionId: !incomingInput.chatId ? incomingInput.socketIOClientId : incomingInput.chatId,
+                        message: result.text ? result.text : result,
+                        isBot: true
+                    })
+                } catch (e) {
+                    console.error(e)
+                }
+
+                try {
+                    await saveMessagePromise
+                } catch (e) {
+                    console.error(e)
+                }
+            }
 
             logger.debug(`[server]: Finished running ${nodeToExecuteData.label} (${nodeToExecuteData.id})`)
             return res.json(result)
