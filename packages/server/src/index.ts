@@ -874,8 +874,13 @@ export class App {
                         incomingInput.question,
                         incomingInput.overrideConfig.databaseDescription
                     ))
-                )
+                ) {
                     chatflowid = (process.env.BASIC_CHAT_GPT as string).trim() //switch to conversation without vector database data
+                    if (incomingInput.overrideConfig.databaseDescription)
+                        incomingInput.overrideConfig.systemMessagePrompt +=
+                            "\nThe following is a description of your context data - we are not using context data for this reply, but if needed, use the description to explain what's your knowledge:\n" +
+                            incomingInput.overrideConfig.databaseDescription
+                }
 
             const chatflow = await this.AppDataSource.getRepository(ChatFlow).findOneBy({
                 id: chatflowid
