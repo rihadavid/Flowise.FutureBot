@@ -945,18 +945,15 @@ export class App {
             let canProceed =
                 process.env.ISLOCAL ||
                 !isMyCloneGPT ||
-                (
-                    incomingInput.overrideConfig &&
+                (incomingInput.overrideConfig &&
                     incomingInput.overrideConfig.openAIApiKey &&
-                    incomingInput.overrideConfig.openAIApiKey.length > 1
-                )(
-                    incomingInput.overrideConfig &&
-                        (
-                            await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
-                                userId: incomingInput.overrideConfig.pineconeNamespace
-                            })
-                        ).data.status
-                )
+                    incomingInput.overrideConfig.openAIApiKey.length > 1) ||
+                (incomingInput.overrideConfig &&
+                    (
+                        await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
+                            userId: incomingInput.overrideConfig.pineconeNamespace
+                        })
+                    ).data.status)
 
             if (!canProceed)
                 return res
