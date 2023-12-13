@@ -799,10 +799,19 @@ export class App {
         }
     }
 
-    async shouldQueryPinecone(messageHistory: Message[], message: string, vectorDbDescription: string): Promise<boolean> {
-        let convertedHistory: OpenAIMessage[] = messageHistory.map((m: Message): OpenAIMessage => {
-            return { role: m.type === 'apiMessage' ? 'assistant' : 'user', content: m.message }
-        })
+    async shouldQueryPinecone(
+        messageHistory: Message[],
+        message: string,
+        vectorDbDescription: string,
+        openAIApiKey: string
+    ): Promise<boolean> {
+        let convertedHistory: OpenAIMessage[]
+
+        if (!messageHistory) convertedHistory = []
+        else
+            convertedHistory = messageHistory.map((m: Message): OpenAIMessage => {
+                return { role: m.type === 'apiMessage' ? 'assistant' : 'user', content: m.message }
+            })
 
         let prompt =
             "Always answer only a single word: YES or NO. I want you to decide, if the last message is only conversational (NO) or if it's something, that might be" +
@@ -829,15 +838,16 @@ export class App {
 
         let response = await this.chatCompletion(
             messages.concat(convertedHistory.slice(-3)).concat([{ role: 'user', content: message }]),
-            0
+            0,
+            openAIApiKey
         )
         return response.data.choices[0].message.content.toLowerCase() === 'yes'
     }
 
-    async chatCompletion(messages: OpenAIMessage[], temperature: number): Promise<any> {
+    async chatCompletion(messages: OpenAIMessage[], temperature: number, openAIApiKey: string): Promise<any> {
         const config: AxiosRequestConfig = {}
         config.headers = {
-            Authorization: `Bearer ${(process.env.OPENAI_API_KEY as string).trim()}`
+            Authorization: `Bearer ${(openAIApiKey ? openAIApiKey : (process.env.OPENAI_API_KEY as string)).trim()}`
         }
         return await axios.post(
             'https://api.openai.com/v1/chat/completions',
@@ -867,20 +877,27 @@ export class App {
 
             const isMyCloneGPT = chatflowid === 'e2447fff-842f-4584-8eea-e983d5d9e663'
 
-            if (isMyCloneGPT && incomingInput.overrideConfig)
-                if (
-                    !(await this.shouldQueryPinecone(
+            if (isMyCloneGPT && incomingInput.overrideConfig) {
+                let shouldQueryP
+                try {
+                    shouldQueryP = await this.shouldQueryPinecone(
                         incomingInput.history,
                         incomingInput.question,
-                        incomingInput.overrideConfig.databaseDescription
-                    ))
-                ) {
+                        incomingInput.overrideConfig.databaseDescription,
+                        incomingInput.overrideConfig.openAIApiKey
+                    )
+                } catch (error: any) {
+                    if (error.response?.status === 401) throw new Error('Chyba. Chatbot má pravděpodobně neplatný OpenAI API klíč.')
+                }
+
+                if (!shouldQueryP) {
                     chatflowid = (process.env.BASIC_CHAT_GPT as string).trim() //switch to conversation without vector database data
                     if (incomingInput.overrideConfig.databaseDescription)
                         incomingInput.overrideConfig.systemMessagePrompt +=
                             "\nThe following is a description of your context data - we are not using context data for this reply, but if needed, use the description to explain what's your knowledge:\n" +
                             incomingInput.overrideConfig.databaseDescription
                 }
+            }
 
             const chatflow = await this.AppDataSource.getRepository(ChatFlow).findOneBy({
                 id: chatflowid
@@ -928,12 +945,18 @@ export class App {
             let canProceed =
                 process.env.ISLOCAL ||
                 !isMyCloneGPT ||
-                (incomingInput.overrideConfig &&
-                    (
-                        await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
-                            userId: incomingInput.overrideConfig.pineconeNamespace
-                        })
-                    ).data.status)
+                (
+                    incomingInput.overrideConfig &&
+                    incomingInput.overrideConfig.openAIApiKey &&
+                    incomingInput.overrideConfig.openAIApiKey.length > 1
+                )(
+                    incomingInput.overrideConfig &&
+                        (
+                            await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
+                                userId: incomingInput.overrideConfig.pineconeNamespace
+                            })
+                        ).data.status
+                )
 
             if (!canProceed)
                 return res
