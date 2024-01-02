@@ -97,6 +97,10 @@
                                 "name": "gpt-4-0613"
                             },
                             {
+                                "label": "gpt-4-1106-preview",
+                                "name": "gpt-4-1106-preview"
+                            },
+                            {
                                 "label": "gpt-4-32k",
                                 "name": "gpt-4-32k"
                             },
