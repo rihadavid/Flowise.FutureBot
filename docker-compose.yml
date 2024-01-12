@@ -9,6 +9,7 @@ services:
             FLOWISE_USERNAME: ${FLOWISE_USERNAME}
             FLOWISE_PASSWORD: ${FLOWISE_PASSWORD}
             OPENAI_API_KEY: ${OPENAI_API_KEY}
+            FUTUREBOT_API_SECRET: ${FUTUREBOT_API_SECRET}
             BASIC_CHAT_GPT: ${BASIC_CHAT_GPT}
             APIKEY_PATH: '/root/.flowise'
             SECRETKEY_PATH: '/root/.flowise'

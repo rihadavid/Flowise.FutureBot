@@ -942,23 +942,30 @@ export class App {
             const nodes = parsedFlowData.nodes
             const edges = parsedFlowData.edges
 
-            let canProceed =
-                process.env.ISLOCAL ||
-                !isMyCloneGPT ||
-                (incomingInput.overrideConfig &&
+            /*      incomingInput.overrideConfig &&
                     incomingInput.overrideConfig.openAIApiKey &&
-                    incomingInput.overrideConfig.openAIApiKey.length > 1) ||
-                (incomingInput.overrideConfig &&
-                    (
-                        await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
-                            userId: incomingInput.overrideConfig.pineconeNamespace
-                        })
-                    ).data.status)
+                    incomingInput.overrideConfig.openAIApiKey.length > 1*/
 
-            if (!canProceed)
-                return res
-                    .status(403)
-                    .send(`Byl dosažen limit požadavků, je vyžadován vlastní chatGPT API klíč. Upozorněte provozovatele této stránky.`)
+            if (!process.env.ISLOCAL && isMyCloneGPT) {
+                if (!incomingInput.overrideConfig) return res.status(403).send(`Chatbot nemá nastavenou konfiguraci.`)
+
+                if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
+
+                let permissionsResult = (
+                    await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
+                        userId: incomingInput.overrideConfig.pineconeNamespace,
+                        secret: process.env.FUTUREBOT_API_SECRET
+                    })
+                ).data
+
+                if (!permissionsResult || !permissionsResult.status)
+                    return res
+                        .status(403)
+                        .send(`Byl dosažen limit požadavků, je vyžadován vlastní chatGPT API klíč. Upozorněte provozovatele této stránky.`)
+
+                if (permissionsResult.customApiKey && permissionsResult.customApiKey.length > 1)
+                    incomingInput.overrideConfig.openAIApiKey = permissionsResult.customApiKey
+            }
 
             /*   Reuse the flow without having to rebuild (to avoid duplicated upsert, recomputation) when all these conditions met:
              * - Node Data already exists in pool
