@@ -949,8 +949,6 @@ export class App {
             if (!process.env.ISLOCAL && isMyCloneGPT) {
                 if (!incomingInput.overrideConfig) return res.status(403).send(`Chatbot nemá nastavenou konfiguraci.`)
 
-                if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
-
                 let permissionsResult = (
                     await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
                         userId: incomingInput.overrideConfig.pineconeNamespace,
@@ -968,6 +966,10 @@ export class App {
 
                 if (permissionsResult.customApiKey && permissionsResult.customApiKey.length > 1)
                     incomingInput.overrideConfig.openAIApiKey = permissionsResult.customApiKey
+
+                incomingInput.overrideConfig.systemMessagePrompt = permissionsResult.systemMessagePrompt
+
+                if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
             }
 
             /*   Reuse the flow without having to rebuild (to avoid duplicated upsert, recomputation) when all these conditions met:
