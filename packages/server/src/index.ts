@@ -877,7 +877,7 @@ export class App {
 
             const isMyCloneGPT = chatflowid === 'e2447fff-842f-4584-8eea-e983d5d9e663'
 
-            if (isMyCloneGPT && incomingInput.overrideConfig) {
+            /*if (isMyCloneGPT && incomingInput.overrideConfig) {
                 let shouldQueryP
                 try {
                     shouldQueryP = await this.shouldQueryPinecone(
@@ -897,7 +897,7 @@ export class App {
                             "\nThe following is a description of your context data - we are not using context data for this reply, but if needed, use the description to explain what's your knowledge:\n" +
                             incomingInput.overrideConfig.databaseDescription
                 }
-            }
+            }*/
 
             const chatflow = await this.AppDataSource.getRepository(ChatFlow).findOneBy({
                 id: chatflowid
@@ -961,7 +961,10 @@ export class App {
                 if (!permissionsResult || !permissionsResult.status)
                     return res
                         .status(403)
-                        .send(`Byl dosažen limit požadavků, je vyžadován vlastní chatGPT API klíč. Upozorněte provozovatele této stránky.`)
+                        .send(
+                            permissionsResult.reason ??
+                                `Byl dosažen limit požadavků, je vyžadován vlastní chatGPT API klíč. Upozorněte provozovatele této stránky.`
+                        )
 
                 if (permissionsResult.customApiKey && permissionsResult.customApiKey.length > 1)
                     incomingInput.overrideConfig.openAIApiKey = permissionsResult.customApiKey

@@ -5,12 +5,18 @@ export const default_qa_template = `Use the following pieces of context to answe
 Question: {question}
 Helpful Answer:`
 
-export const qa_template = `Use the following pieces of context to answer the question at the end.
-
+export const qa_template = `
+--START OF USER MESSAGE:
+{question}
+--END OF USER MESSAGE--
+--START OF CONTEXT DATA:
 {context}
-
-Question: {question}
-Helpful Answer:`
+--END OF CONTEXT DATA--
+NOW MAKE A DECISION:
+If the user message seems to not require further information, like greeting, thanking, small talk, acknowledging your answer etc., respond naturally (e.g. "you are welcome", "have a great day") and ignore the rest of this prompt.
+OTHERWISE:
+If the user message is not related to the context data, say you don't know the answer.
+If the user message is relevant to the context data, answer it using the context data and not prior knowledge.`
 
 export const default_map_reduce_template = `Given the following extracted parts of a long document and a question, create a final answer. 
 If you don't know the answer, just say that you don't know. Don't try to make up an answer.
@@ -57,6 +63,7 @@ Given the new context, refine the original answer to better answer the question.
 If you can't find answer from the context, return the original answer.`
 
 export const CUSTOM_QUESTION_GENERATOR_CHAIN_PROMPT = `Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, answer in the same language as the follow up question. include it in the standalone question.
+If the follow up question seems to not require further information, like greeting, thanking, small talk, acknowledging answer etc., keep the standalone question same as the original.
 
 Chat History:
 {chat_history}
