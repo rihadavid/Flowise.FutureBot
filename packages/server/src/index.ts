@@ -946,7 +946,17 @@ export class App {
                     incomingInput.overrideConfig.openAIApiKey &&
                     incomingInput.overrideConfig.openAIApiKey.length > 1*/
 
-            if (!process.env.ISLOCAL && isMyCloneGPT) {
+            let mycloneWhitelist = ['pavel-smbc', 'smc-podpora', 'testdata']
+
+            if (
+                !process.env.ISLOCAL &&
+                isMyCloneGPT &&
+                !(
+                    incomingInput.overrideConfig &&
+                    mycloneWhitelist.includes(incomingInput.overrideConfig.pineconeNamespace) &&
+                    incomingInput.overrideConfig.systemMessagePrompt
+                )
+            ) {
                 if (!incomingInput.overrideConfig) return res.status(403).send(`Chatbot nemá nastavenou konfiguraci.`)
 
                 let permissionsResult = (
