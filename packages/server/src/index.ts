@@ -962,6 +962,7 @@ export class App {
                 let permissionsResult = (
                     await axios.post('https://futurebot.ai/api/flowise/v1/check_flowise_permissions/', {
                         userId: incomingInput.overrideConfig.pineconeNamespace,
+                        sessionId: !incomingInput.chatId ? incomingInput.socketIOClientId : incomingInput.chatId,
                         secret: process.env.FUTUREBOT_API_SECRET
                     })
                 ).data
