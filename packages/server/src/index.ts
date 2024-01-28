@@ -978,6 +978,8 @@ export class App {
                     incomingInput.overrideConfig.openAIApiKey = permissionsResult.customApiKey
 
                 incomingInput.overrideConfig.systemMessagePrompt = permissionsResult.systemMessagePrompt
+                incomingInput.overrideConfig.topK = permissionsResult.topK
+                incomingInput.overrideConfig.returnSourceDocuments = permissionsResult.returnSourceDocuments
 
                 if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
             }
