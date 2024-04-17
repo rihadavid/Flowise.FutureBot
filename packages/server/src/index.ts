@@ -852,7 +852,7 @@ export class App {
         return await axios.post(
             'https://api.openai.com/v1/chat/completions',
             {
-                model: 'gpt-4-1106-preview',
+                model: 'gpt-4-turbo',
                 messages: messages,
                 temperature: temperature
             },
