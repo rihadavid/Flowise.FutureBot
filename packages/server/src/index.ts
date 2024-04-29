@@ -985,11 +985,10 @@ export class App {
                 if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
             }
 
-            if (
-                incomingInput.overrideConfig &&
-                incomingInput.overrideConfig.pineconeNamespace === process.env.FUTUREBOT_ID &&
-                incomingInput.overrideConfig.expertProfileUid
-            ) {
+            if (incomingInput.overrideConfig && incomingInput.overrideConfig.pineconeNamespace === process.env.FUTUREBOT_ID) {
+                if (!incomingInput.overrideConfig.expertProfileUid)
+                    return res.status(403).send(`Nepodařilo se identifikovat uživatele, ujistěte se, že jste přihlášeni.`)
+
                 let related = (
                     await axios.post('https://' + process.env.LAMBDA_URL + '.lambda-url.eu-central-1.on.aws/', {
                         method: 'search',
