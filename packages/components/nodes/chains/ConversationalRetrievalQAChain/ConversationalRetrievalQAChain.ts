@@ -10,6 +10,7 @@ import {
     default_map_reduce_template,
     default_qa_template,
     qa_template,
+    qa_template_futurebot,
     map_reduce_template,
     CUSTOM_QUESTION_GENERATOR_CHAIN_PROMPT,
     refine_question_template,
@@ -107,6 +108,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         const returnSourceDocuments = nodeData.inputs?.returnSourceDocuments as boolean
         const chainOption = nodeData.inputs?.chainOption as string
         const externalMemory = nodeData.inputs?.memory
+        const isFuturebot = nodeData.inputs?.isFuturebot as boolean
 
         const obj: any = {
             verbose: process.env.DEBUG === 'true' ? true : false,
@@ -137,6 +139,13 @@ class ConversationalRetrievalQAChain_Chains implements INode {
                 type: 'refine',
                 questionPrompt: qprompt,
                 refinePrompt: rprompt
+            } as QAChainParams
+        } else if (isFuturebot) {
+            obj.qaChainOptions = {
+                type: 'stuff',
+                prompt: PromptTemplate.fromTemplate(
+                    systemMessagePrompt ? `${systemMessagePrompt}\n${qa_template_futurebot}` : default_qa_template
+                )
             } as QAChainParams
         } else {
             obj.qaChainOptions = {

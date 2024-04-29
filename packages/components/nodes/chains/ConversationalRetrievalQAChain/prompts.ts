@@ -18,6 +18,14 @@ OTHERWISE:
 If the user message is not related to the context data, say you don't know the answer.
 If the user message is relevant to the context data, answer it using the context data and not prior knowledge.`
 
+export const qa_template_futurebot = `
+--START OF FUTUREBOT CONTEXT DATA:
+{context}
+--END OF FUTUREBOT CONTEXT DATA--
+--START OF USER MESSAGE:
+{question}
+--END OF USER MESSAGE--`
+
 export const default_map_reduce_template = `Given the following extracted parts of a long document and a question, create a final answer. 
 If you don't know the answer, just say that you don't know. Don't try to make up an answer.
 

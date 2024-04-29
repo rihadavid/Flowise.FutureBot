@@ -985,6 +985,49 @@ export class App {
                 if (!incomingInput.overrideConfig.systemMessagePrompt) return res.status(403).send(`Chatbot nemá nastavený prompt.`)
             }
 
+            if (
+                incomingInput.overrideConfig &&
+                incomingInput.overrideConfig.pineconeNamespace === process.env.FUTUREBOT_ID &&
+                incomingInput.overrideConfig.expertProfileUid
+            ) {
+                let related = (
+                    await axios.post('https://' + process.env.LAMBDA_URL + '.lambda-url.eu-central-1.on.aws/', {
+                        method: 'search',
+                        value: req.body.question,
+                        userId: incomingInput.overrideConfig.expertProfileUid
+                    })
+                ).data
+
+                //logger.info('fetched data for profile ' + incomingInput.overrideConfig.expertProfileUid + ', data:\n' + JSON.stringify(related.texts));
+
+                let acSummary = (
+                    await axios.post('https://futurebot.ai/api/flowise/v1/ac_summary/', {
+                        userId: incomingInput.overrideConfig.expertProfileUid,
+                        secret: process.env.FUTUREBOT_API_SECRET
+                    })
+                ).data
+
+                let summaryString = JSON.stringify(acSummary).replace(/{/g, '(').replace(/}/g, ')')
+
+                //logger.info('fetched ac summary: ' + summaryString);
+
+                const language = acSummary.language
+
+                //logger.info('language: ' + language);
+
+                incomingInput.overrideConfig.systemMessagePrompt =
+                    'Odpovědi piš výhradně v jazyce ' +
+                    language +
+                    ' bez ohledu na text uživatele.\n' +
+                    incomingInput.overrideConfig.systemMessagePrompt +
+                    '\n--USER PROFILE INFO:\n' +
+                    summaryString +
+                    '\n--END OF USER PROFILE INFO--\n--START OF USER CONTEXT DATA:\n' +
+                    JSON.stringify(related.texts) +
+                    '\n--END OF USER CONTEXT DATA--'
+                incomingInput.overrideConfig.isFuturebot = true
+            }
+
             /*   Reuse the flow without having to rebuild (to avoid duplicated upsert, recomputation) when all these conditions met:
              * - Node Data already exists in pool
              * - Still in sync (i.e the flow has not been modified since)
