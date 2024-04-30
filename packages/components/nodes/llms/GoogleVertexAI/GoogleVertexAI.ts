@@ -1,7 +1,9 @@
-import { ICommonObject, INode, INodeData, INodeParams } from '../../../src/Interface'
-import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../src/utils'
-import { GoogleVertexAI, GoogleVertexAITextInput } from 'langchain/llms/googlevertexai'
 import { GoogleAuthOptions } from 'google-auth-library'
+import { BaseCache } from '@langchain/core/caches'
+import { GoogleVertexAI, GoogleVertexAITextInput } from '@langchain/community/llms/googlevertexai'
+import { ICommonObject, INode, INodeData, INodeOptionsValue, INodeParams } from '../../../src/Interface'
+import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../src/utils'
+import { getModels, MODEL_TYPE } from '../../../src/modelLoader'
 
 class GoogleVertexAI_LLMs implements INode {
     label: string
@@ -18,9 +20,9 @@ class GoogleVertexAI_LLMs implements INode {
     constructor() {
         this.label = 'GoogleVertexAI'
         this.name = 'googlevertexai'
-        this.version = 1.0
+        this.version = 3.0
         this.type = 'GoogleVertexAI'
-        this.icon = 'vertexai.svg'
+        this.icon = 'GoogleVertex.svg'
         this.category = 'LLMs'
         this.description = 'Wrapper around GoogleVertexAI large language models'
         this.baseClasses = [this.type, ...getBaseClasses(GoogleVertexAI)]
@@ -35,35 +37,16 @@ class GoogleVertexAI_LLMs implements INode {
         }
         this.inputs = [
             {
+                label: 'Cache',
+                name: 'cache',
+                type: 'BaseCache',
+                optional: true
+            },
+            {
                 label: 'Model Name',
                 name: 'modelName',
-                type: 'options',
-                options: [
-                    {
-                        label: 'text-bison',
-                        name: 'text-bison'
-                    },
-                    {
-                        label: 'code-bison',
-                        name: 'code-bison'
-                    },
-                    {
-                        label: 'code-gecko',
-                        name: 'code-gecko'
-                    },
-                    {
-                        label: 'text-bison-32k',
-                        name: 'text-bison-32k'
-                    },
-                    {
-                        label: 'code-bison-32k',
-                        name: 'code-bison-32k'
-                    },
-                    {
-                        label: 'code-gecko-32k',
-                        name: 'code-gecko-32k'
-                    }
-                ],
+                type: 'asyncOptions',
+                loadMethod: 'listModels',
                 default: 'text-bison'
             },
             {
@@ -93,6 +76,13 @@ class GoogleVertexAI_LLMs implements INode {
         ]
     }
 
+    //@ts-ignore
+    loadMethods = {
+        async listModels(): Promise<INodeOptionsValue[]> {
+            return await getModels(MODEL_TYPE.LLM, 'googlevertexai')
+        }
+    }
+
     async init(nodeData: INodeData, _: string, options: ICommonObject): Promise<any> {
         const credentialData = await getCredentialData(nodeData.credential ?? '', options)
         const googleApplicationCredentialFilePath = getCredentialParam('googleApplicationCredentialFilePath', credentialData, nodeData)
@@ -120,6 +110,7 @@ class GoogleVertexAI_LLMs implements INode {
         const modelName = nodeData.inputs?.modelName as string
         const maxOutputTokens = nodeData.inputs?.maxOutputTokens as string
         const topP = nodeData.inputs?.topP as string
+        const cache = nodeData.inputs?.cache as BaseCache
 
         const obj: Partial<GoogleVertexAITextInput> = {
             temperature: parseFloat(temperature),
@@ -129,6 +120,7 @@ class GoogleVertexAI_LLMs implements INode {
 
         if (maxOutputTokens) obj.maxOutputTokens = parseInt(maxOutputTokens, 10)
         if (topP) obj.topP = parseFloat(topP)
+        if (cache) obj.cache = cache
 
         const model = new GoogleVertexAI(obj)
         return model
