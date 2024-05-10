@@ -1,15 +1,20 @@
+import { applyPatch } from 'fast-json-patch'
 import { DataSource } from 'typeorm'
-//import { BaseLanguageModel } from '@langchain/core/language_models/base'
-import { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { BaseLanguageModel } from '@langchain/core/language_models/base'
+//import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { BaseRetriever } from '@langchain/core/retrievers'
 import { PromptTemplate, ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
 import { Runnable, RunnableSequence, RunnableMap, RunnableBranch, RunnableLambda } from '@langchain/core/runnables'
 import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages'
+import { ConsoleCallbackHandler as LCConsoleCallbackHandler } from '@langchain/core/tracers/console'
+import { checkInputs, Moderation, streamResponse } from '../../moderation/Moderation'
+import { formatResponse } from '../../outputparsers/OutputParserHelpers'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import type { Document } from '@langchain/core/documents'
 import { BufferMemoryInput } from 'langchain/memory'
 import { ConversationalRetrievalQAChain } from 'langchain/chains'
 import { getBaseClasses, mapChatMessageToBaseMessage } from '../../../src/utils'
+import { ConsoleCallbackHandler, additionalCallbacks } from '../../../src/handler'
 import {
     FlowiseMemory,
     ICommonObject,
@@ -148,7 +153,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
     }
 
     async init(nodeData: INodeData): Promise<any> {
-        const model = nodeData.inputs?.model as BaseChatModel
+        const model = nodeData.inputs?.model as BaseLanguageModel
         const vectorStoreRetriever = nodeData.inputs?.vectorStoreRetriever as BaseRetriever
         const systemMessagePrompt = nodeData.inputs?.systemMessagePrompt as string
         const rephrasePrompt = nodeData.inputs?.rephrasePrompt as string
@@ -165,7 +170,9 @@ class ConversationalRetrievalQAChain_Chains implements INode {
     }
 
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | ICommonObject> {
-        /*const model = nodeData.inputs?.model as BaseChatModel & IVisionChatModal
+        logger.info('run')
+
+        const model = nodeData.inputs?.model as BaseLanguageModel //BaseChatModel & IVisionChatModal
         const externalMemory = nodeData.inputs?.memory
         const vectorStoreRetriever = nodeData.inputs?.vectorStoreRetriever as BaseRetriever
         const systemMessagePrompt = nodeData.inputs?.systemMessagePrompt as string
@@ -196,9 +203,9 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             })
         }
 
-        let log = '';
+        let log = ''
 
-        let supportsVision = llmSupportsVision(model);
+        /*let supportsVision = llmSupportsVision(model);
         log += "supportsVision?" + supportsVision;
         if (supportsVision) {
             const visionChatModel = model as IVisionChatModal;
@@ -211,7 +218,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
                 visionChatModel.revertToOriginalModel();
                 log += ";revertToOriginalModel";
             }
-        }
+        }*/
 
         if (moderations && moderations.length > 0) {
             try {
@@ -246,7 +253,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 
         let streamedResponse: Record<string, any> = {}
         let sourceDocuments: ICommonObject[] = []
-        let text = log + ''
+        let text = ''
         let isStreamingStarted = false
         const isStreamingEnabled = options.socketIO && options.socketIOClientId
 
@@ -254,7 +261,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             streamedResponse = applyPatch(streamedResponse, chunk.ops).newDocument
 
             if (streamedResponse.final_output) {
-                text = log + streamedResponse.final_output?.output
+                text = streamedResponse.final_output?.output
                 if (isStreamingEnabled) options.socketIO.to(options.socketIOClientId).emit('end')
                 if (Array.isArray(streamedResponse?.logs?.[sourceRunnableName]?.final_output?.output)) {
                     sourceDocuments = streamedResponse?.logs?.[sourceRunnableName]?.final_output?.output
@@ -293,12 +300,11 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         )
 
         if (returnSourceDocuments) return { text, sourceDocuments }
-        else return { text }*/
-        return ''
+        else return { text }
     }
 }
 
-const createRetrieverChain = (llm: BaseChatModel, retriever: Runnable, rephrasePrompt: string) => {
+const createRetrieverChain = (llm: BaseLanguageModel, retriever: Runnable, rephrasePrompt: string) => {
     // Small speed/accuracy optimization: no need to rephrase the first question
     // since there shouldn't be any meta-references to prior chat history
     const CONDENSE_QUESTION_PROMPT = PromptTemplate.fromTemplate(rephrasePrompt)
@@ -346,7 +352,12 @@ const serializeHistory = (input: any) => {
     return convertedChatHistory
 }
 
-const createChain = (llm: BaseChatModel, retriever: Runnable, rephrasePrompt = REPHRASE_TEMPLATE, responsePrompt = RESPONSE_TEMPLATE) => {
+const createChain = (
+    llm: BaseLanguageModel,
+    retriever: Runnable,
+    rephrasePrompt = REPHRASE_TEMPLATE,
+    responsePrompt = RESPONSE_TEMPLATE
+) => {
     logger.info('createChain')
 
     const retrieverChain = createRetrieverChain(llm, retriever, rephrasePrompt)

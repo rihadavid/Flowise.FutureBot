@@ -27,7 +27,7 @@ import {
 } from '../../../src/Interface'
 import { ConsoleCallbackHandler, CustomChainHandler, additionalCallbacks } from '../../../src/handler'
 import { getBaseClasses, handleEscapeCharacters } from '../../../src/utils'
-import logger from '../../../../server/src/utils/logger'
+//import logger from '../../../../server/src/utils/logger'
 
 let systemMessage = `The following is a friendly conversation between a human and an AI. The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.`
 const inputKey = 'input'
@@ -110,7 +110,7 @@ class ConversationChain_Chains implements INode {
     }
 
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | object> {
-        logger.info('ConversationChain run')
+        //logger.info('ConversationChain run')
         const memory = nodeData.inputs?.memory
 
         const chain = await prepareChain(nodeData, options, this.sessionId)
@@ -164,7 +164,7 @@ class ConversationChain_Chains implements INode {
 }
 
 const prepareChatPrompt = (nodeData: INodeData, humanImageMessages: MessageContentImageUrl[]) => {
-    logger.info('ConversationChain prepareChatPrompt')
+    //logger.info('ConversationChain prepareChatPrompt')
     const memory = nodeData.inputs?.memory as FlowiseMemory
     const prompt = nodeData.inputs?.systemMessagePrompt as string
     const chatPromptTemplate = nodeData.inputs?.chatPromptTemplate as ChatPromptTemplate
@@ -220,7 +220,7 @@ const prepareChatPrompt = (nodeData: INodeData, humanImageMessages: MessageConte
 }
 
 const prepareChain = async (nodeData: INodeData, options: ICommonObject, sessionId?: string) => {
-    logger.info('ConversationChain prepareChain')
+    //logger.info('ConversationChain prepareChain')
     let model = nodeData.inputs?.model as BaseChatModel
     const memory = nodeData.inputs?.memory as FlowiseMemory
     const memoryKey = memory.memoryKey ?? 'chat_history'
