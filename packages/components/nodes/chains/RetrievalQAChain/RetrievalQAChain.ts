@@ -6,6 +6,7 @@ import { ICommonObject, INode, INodeData, INodeParams } from '../../../src/Inter
 import { getBaseClasses } from '../../../src/utils'
 import { checkInputs, Moderation, streamResponse } from '../../moderation/Moderation'
 import { formatResponse } from '../../outputparsers/OutputParserHelpers'
+import logger from '../../../../server/src/utils/logger'
 
 class RetrievalQAChain_Chains implements INode {
     label: string
@@ -58,6 +59,8 @@ class RetrievalQAChain_Chains implements INode {
     }
 
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | object> {
+        logger.info('RetrievalQAChain run')
+
         const chain = nodeData.instance as RetrievalQAChain
         const moderations = nodeData.inputs?.inputModeration as Moderation[]
         if (moderations && moderations.length > 0) {
