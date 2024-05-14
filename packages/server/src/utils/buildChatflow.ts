@@ -112,6 +112,8 @@ async function chatCompletion(messages: OpenAIMessage[], temperature: number, op
  */
 export const utilBuildChatflow = async (req: Request, socketIO?: Server, isInternal: boolean = false): Promise<any> => {
     try {
+        logger.info('utilBuildChatflow')
+
         const appServer = getRunningExpressApp()
         const chatflowid = req.params.id
         let incomingInput: IncomingInput = req.body
@@ -147,7 +149,7 @@ export const utilBuildChatflow = async (req: Request, socketIO?: Server, isInter
             throw new InternalFlowiseError(StatusCodes.NOT_FOUND, `Chatflow ${chatflowid} not found`)
         }
 
-        const chatId = incomingInput.chatId ?? incomingInput.overrideConfig?.sessionId ?? uuidv4()
+        const chatId = incomingInput.chatId ?? incomingInput.overrideConfig?.sessionId ?? incomingInput.socketIOClientId ?? uuidv4()
         const userMessageDateTime = new Date()
 
         if (!isInternal) {

@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm'
 import { BaseLanguageModel } from '@langchain/core/language_models/base'
 //import { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { BaseRetriever } from '@langchain/core/retrievers'
-import { PromptTemplate, ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts'
+import { ChatPromptTemplate, MessagesPlaceholder, BaseMessagePromptTemplateLike, PromptTemplate } from '@langchain/core/prompts'
 import { Runnable, RunnableSequence, RunnableMap, RunnableBranch, RunnableLambda } from '@langchain/core/runnables'
 import { BaseMessage, HumanMessage, AIMessage } from '@langchain/core/messages'
 import { ConsoleCallbackHandler as LCConsoleCallbackHandler } from '@langchain/core/tracers/console'
@@ -16,6 +16,7 @@ import { ConversationalRetrievalQAChain } from 'langchain/chains'
 import { getBaseClasses, mapChatMessageToBaseMessage } from '../../../src/utils'
 import { ConsoleCallbackHandler, additionalCallbacks } from '../../../src/handler'
 import {
+    IVisionChatModal,
     FlowiseMemory,
     ICommonObject,
     IMessage,
@@ -23,10 +24,13 @@ import {
     INodeData,
     INodeParams,
     IDatabaseEntity,
-    MemoryMethods
+    MemoryMethods,
+    MessageContentImageUrl
 } from '../../../src/Interface'
-import { QA_TEMPLATE, REPHRASE_TEMPLATE, RESPONSE_TEMPLATE } from './prompts'
-import logger from '../../../../server/src/utils/logger'
+
+import { QA_TEMPLATE, REPHRASE_TEMPLATE, RESPONSE_TEMPLATE, qa_template_futurebot } from './prompts'
+//import logger from '../../../../server/src/utils/logger'
+import { addImagesToMessages } from '../../../src/multiModalUtils'
 
 type RetrievalChainInput = {
     chat_history: string
@@ -159,20 +163,20 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         const rephrasePrompt = nodeData.inputs?.rephrasePrompt as string
         const responsePrompt = nodeData.inputs?.responsePrompt as string
 
-        let customResponsePrompt = responsePrompt
-        // If the deprecated systemMessagePrompt is still exists
-        if (systemMessagePrompt) {
-            customResponsePrompt = `${systemMessagePrompt}\n${QA_TEMPLATE}`
-        }
+        const isFuturebot = nodeData.inputs?.isFuturebot as boolean
+        let customResponsePrompt = isFuturebot
+            ? `${systemMessagePrompt}\n${qa_template_futurebot}`
+            : `${systemMessagePrompt}\n${QA_TEMPLATE}`
 
-        const answerChain = createChain(model, vectorStoreRetriever, rephrasePrompt, customResponsePrompt)
+        let messageContent: MessageContentImageUrl[] = []
+
+        const answerChain = createChain(model, vectorStoreRetriever, rephrasePrompt, customResponsePrompt, messageContent)
         return answerChain
     }
 
     async run(nodeData: INodeData, input: string, options: ICommonObject): Promise<string | ICommonObject> {
-        logger.info('run')
-
-        const model = nodeData.inputs?.model as BaseLanguageModel //BaseChatModel & IVisionChatModal
+        //logger.info("llmSupportsVision")
+        const model = nodeData.inputs?.model as BaseLanguageModel & IVisionChatModal //BaseChatModel & IVisionChatModal
         const externalMemory = nodeData.inputs?.memory
         const vectorStoreRetriever = nodeData.inputs?.vectorStoreRetriever as BaseRetriever
         const systemMessagePrompt = nodeData.inputs?.systemMessagePrompt as string
@@ -180,16 +184,13 @@ class ConversationalRetrievalQAChain_Chains implements INode {
         const responsePrompt = nodeData.inputs?.responsePrompt as string
         const returnSourceDocuments = nodeData.inputs?.returnSourceDocuments as boolean
         const isFuturebot = nodeData.inputs?.isFuturebot as boolean
+        let customResponsePrompt = isFuturebot
+            ? `${systemMessagePrompt}\n${qa_template_futurebot}`
+            : `${systemMessagePrompt}\n${QA_TEMPLATE}`
 
         const appDataSource = options.appDataSource as DataSource
         const databaseEntities = options.databaseEntities as IDatabaseEntity
         const chatflowid = options.chatflowid as string
-
-        let customResponsePrompt = responsePrompt
-        // If the deprecated systemMessagePrompt is still exists
-        if (systemMessagePrompt) {
-            customResponsePrompt = `${systemMessagePrompt}\n${QA_TEMPLATE}`
-        }
 
         let memory: FlowiseMemory | undefined = externalMemory
         const moderations = nodeData.inputs?.inputModeration as Moderation[]
@@ -203,22 +204,8 @@ class ConversationalRetrievalQAChain_Chains implements INode {
             })
         }
 
-        let log = ''
-
-        /*let supportsVision = llmSupportsVision(model);
-        log += "supportsVision?" + supportsVision;
-        if (supportsVision) {
-            const visionChatModel = model as IVisionChatModal;
-            const messageContent = await addImagesToMessages(nodeData, options, visionChatModel.multiModalOption);
-            if (messageContent?.length) {
-                visionChatModel.setVisionModel();
-                log += ";setVisionModel";
-            } else {
-                // If no images are found, ensure the model reverts to the original configuration
-                visionChatModel.revertToOriginalModel();
-                log += ";revertToOriginalModel";
-            }
-        }*/
+        let messageContent: MessageContentImageUrl[] = []
+        messageContent = await addImagesToMessages(nodeData, options, model.multiModalOption)
 
         if (moderations && moderations.length > 0) {
             try {
@@ -230,7 +217,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
                 return formatResponse(e.message)
             }
         }
-        const answerChain = createChain(model, vectorStoreRetriever, rephrasePrompt, customResponsePrompt)
+        const answerChain = createChain(model, vectorStoreRetriever, rephrasePrompt, customResponsePrompt, messageContent)
 
         const history = ((await memory.getChatMessages(this.sessionId, false)) as IMessage[]) ?? []
 
@@ -305,6 +292,7 @@ class ConversationalRetrievalQAChain_Chains implements INode {
 }
 
 const createRetrieverChain = (llm: BaseLanguageModel, retriever: Runnable, rephrasePrompt: string) => {
+    //logger.info('ConversationalRetrievalQAChain createRetrieverChain')
     // Small speed/accuracy optimization: no need to rephrase the first question
     // since there shouldn't be any meta-references to prior chat history
     const CONDENSE_QUESTION_PROMPT = PromptTemplate.fromTemplate(rephrasePrompt)
@@ -356,9 +344,10 @@ const createChain = (
     llm: BaseLanguageModel,
     retriever: Runnable,
     rephrasePrompt = REPHRASE_TEMPLATE,
-    responsePrompt = RESPONSE_TEMPLATE
+    responsePrompt = RESPONSE_TEMPLATE,
+    humanImageMessages: MessageContentImageUrl[]
 ) => {
-    logger.info('createChain')
+    //logger.info('ConversationalRetrievalQAChain createChain')
 
     const retrieverChain = createRetrieverChain(llm, retriever, rephrasePrompt)
 
@@ -381,11 +370,15 @@ const createChain = (
         })
     }).withConfig({ tags: ['RetrieveDocs'] })
 
-    const prompt = ChatPromptTemplate.fromMessages([
+    let msgs: BaseMessagePromptTemplateLike[] = [
         ['system', responsePrompt],
         new MessagesPlaceholder('chat_history'),
         ['human', `{question}`]
-    ])
+    ]
+
+    if (humanImageMessages.length) msgs.push(new HumanMessage({ content: [...humanImageMessages] }))
+
+    const prompt = ChatPromptTemplate.fromMessages(msgs)
 
     const responseSynthesizerChain = RunnableSequence.from([prompt, llm, new StringOutputParser()]).withConfig({
         tags: ['GenerateResponse']

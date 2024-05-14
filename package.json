@@ -14,7 +14,7 @@
         "build-force": "pnpm clean && turbo run build --force",
         "dev": "turbo run dev --parallel",
         "start": "run-script-os",
-        "start:windows": "cd packages/server/bin && run start",
+        "start:windows": "cd packages/server/bin && node --inspect-brk=9230 run start",
         "start:default": "cd packages/server/bin && ./run start",
         "clean": "pnpm --filter \"./packages/**\" clean",
         "nuke": "pnpm --filter \"./packages/**\" nuke && rimraf node_modules .turbo",

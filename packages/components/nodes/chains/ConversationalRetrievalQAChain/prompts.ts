@@ -1,7 +1,4 @@
 export const QA_TEMPLATE = `
---START OF USER MESSAGE:
-{question}
---END OF USER MESSAGE--
 --START OF CONTEXT DATA:
 {context}
 --END OF CONTEXT DATA--
