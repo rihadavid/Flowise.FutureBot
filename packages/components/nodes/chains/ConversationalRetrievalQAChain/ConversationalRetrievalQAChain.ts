@@ -12,6 +12,8 @@ import { formatResponse } from '../../outputparsers/OutputParserHelpers'
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import type { Document } from '@langchain/core/documents'
 import { BufferMemoryInput } from 'langchain/memory'
+import { VectorStore, VectorStoreRetriever } from 'langchain/dist/vectorstores/base'
+import { Callbacks } from 'langchain/callbacks'
 import { ConversationalRetrievalQAChain } from 'langchain/chains'
 import { getBaseClasses, mapChatMessageToBaseMessage } from '../../../src/utils'
 import { ConsoleCallbackHandler, additionalCallbacks } from '../../../src/handler'
@@ -217,6 +219,24 @@ class ConversationalRetrievalQAChain_Chains implements INode {
                 return formatResponse(e.message)
             }
         }
+
+        //CUSTOM EDIT: copy the score to the ouput, as a field in metaData
+        let vs = vectorStoreRetriever as VectorStoreRetriever
+        ;(vs.vectorStore as VectorStore).similaritySearch = async function (
+            query: string,
+            k = 4,
+            filter: any | undefined = undefined,
+            _callbacks: Callbacks | undefined = undefined // implement passing to embedQuery later
+        ): Promise<any[]> {
+            const results = await this.similaritySearchVectorWithScore(await this.embeddings.embedQuery(query), k, filter)
+
+            return results.map((result) => {
+                let doc = result[0]
+                if (doc.metadata) doc.metadata['score'] = result[1]
+                return doc
+            })
+        }
+
         const answerChain = createChain(model, vectorStoreRetriever, rephrasePrompt, customResponsePrompt, messageContent)
 
         const history = ((await memory.getChatMessages(this.sessionId, false)) as IMessage[]) ?? []

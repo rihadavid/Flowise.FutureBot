@@ -242,6 +242,27 @@ export const utilBuildChatflow = async (req: Request, socketIO?: Server, isInter
 
         let mycloneWhitelist = ['pavel-smbc', 'smc-podpora', 'testdata']
 
+        let futurebotPineconePromise
+        let acSummaryPromise
+
+        if (incomingInput.overrideConfig && incomingInput.overrideConfig.pineconeNamespace === process.env.FUTUREBOT_ID) {
+            if (!incomingInput.overrideConfig.expertProfileUid)
+                throw new InternalFlowiseError(403, `Nepodařilo se identifikovat uživatele, ujistěte se, že jste přihlášeni.`)
+
+            futurebotPineconePromise = axios.post('https://' + process.env.LAMBDA_URL + '.lambda-url.eu-central-1.on.aws/', {
+                method: 'search',
+                value: req.body.question,
+                userId: incomingInput.overrideConfig.expertProfileUid
+            })
+
+            //logger.info('fetched data for profile ' + incomingInput.overrideConfig.expertProfileUid + ', data:\n' + JSON.stringify(related.texts));
+
+            acSummaryPromise = axios.post('https://futurebot.ai/api/flowise/v1/ac_summary/', {
+                userId: incomingInput.overrideConfig.expertProfileUid,
+                secret: process.env.FUTUREBOT_API_SECRET
+            })
+        }
+
         if (
             !process.env.ISLOCAL &&
             isMyCloneGPT &&
@@ -281,25 +302,13 @@ export const utilBuildChatflow = async (req: Request, socketIO?: Server, isInter
         }
 
         if (incomingInput.overrideConfig && incomingInput.overrideConfig.pineconeNamespace === process.env.FUTUREBOT_ID) {
-            if (!incomingInput.overrideConfig.expertProfileUid)
-                throw new InternalFlowiseError(403, `Nepodařilo se identifikovat uživatele, ujistěte se, že jste přihlášeni.`)
-
-            let related = (
-                await axios.post('https://' + process.env.LAMBDA_URL + '.lambda-url.eu-central-1.on.aws/', {
-                    method: 'search',
-                    value: req.body.question,
-                    userId: incomingInput.overrideConfig.expertProfileUid
-                })
-            ).data
+            // @ts-ignore
+            let related = (await futurebotPineconePromise).data
 
             //logger.info('fetched data for profile ' + incomingInput.overrideConfig.expertProfileUid + ', data:\n' + JSON.stringify(related.texts));
 
-            let acSummary = (
-                await axios.post('https://futurebot.ai/api/flowise/v1/ac_summary/', {
-                    userId: incomingInput.overrideConfig.expertProfileUid,
-                    secret: process.env.FUTUREBOT_API_SECRET
-                })
-            ).data
+            // @ts-ignore
+            let acSummary = (await acSummaryPromise).data
 
             let summaryString = JSON.stringify(acSummary).replace(/{/g, '(').replace(/}/g, ')')
 
