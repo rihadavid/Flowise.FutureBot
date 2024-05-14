@@ -47,6 +47,10 @@ import { maxScroll } from '@/store/constant'
 
 const assistantAvailableModels = [
     {
+        label: 'gpt-4o',
+        name: 'gpt-4o'
+    },
+    {
         label: 'gpt-4-turbo',
         name: 'gpt-4-turbo'
     },
