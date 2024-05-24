@@ -1,6 +1,9 @@
-import { ICommonObject, INode, INodeData, INodeParams } from '../../../src/Interface'
+import { OpenAI, OpenAIInput } from '@langchain/openai'
+import { BaseCache } from '@langchain/core/caches'
+import { BaseLLMParams } from '@langchain/core/language_models/llms'
+import { ICommonObject, INode, INodeData, INodeOptionsValue, INodeParams } from '../../../src/Interface'
 import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../src/utils'
-import { OpenAI, OpenAIInput } from 'langchain/llms/openai'
+import { getModels, MODEL_TYPE } from '../../../src/modelLoader'
 
 class OpenAI_LLMs implements INode {
     label: string
@@ -17,9 +20,9 @@ class OpenAI_LLMs implements INode {
     constructor() {
         this.label = 'OpenAI'
         this.name = 'openAI'
-        this.version = 1.0
+        this.version = 4.0
         this.type = 'OpenAI'
-        this.icon = 'openai.png'
+        this.icon = 'openai.svg'
         this.category = 'LLMs'
         this.description = 'Wrapper around OpenAI large language models'
         this.baseClasses = [this.type, ...getBaseClasses(OpenAI)]
@@ -31,29 +34,17 @@ class OpenAI_LLMs implements INode {
         }
         this.inputs = [
             {
+                label: 'Cache',
+                name: 'cache',
+                type: 'BaseCache',
+                optional: true
+            },
+            {
                 label: 'Model Name',
                 name: 'modelName',
-                type: 'options',
-                options: [
-                    {
-                        label: 'text-davinci-003',
-                        name: 'text-davinci-003'
-                    },
-                    {
-                        label: 'text-davinci-002',
-                        name: 'text-davinci-002'
-                    },
-                    {
-                        label: 'text-curie-001',
-                        name: 'text-curie-001'
-                    },
-                    {
-                        label: 'text-babbage-001',
-                        name: 'text-babbage-001'
-                    }
-                ],
-                default: 'text-davinci-003',
-                optional: true
+                type: 'asyncOptions',
+                loadMethod: 'listModels',
+                default: 'gpt-3.5-turbo-instruct'
             },
             {
                 label: 'Temperature',
@@ -136,6 +127,13 @@ class OpenAI_LLMs implements INode {
         ]
     }
 
+    //@ts-ignore
+    loadMethods = {
+        async listModels(): Promise<INodeOptionsValue[]> {
+            return await getModels(MODEL_TYPE.LLM, 'openAI')
+        }
+    }
+
     async init(nodeData: INodeData, _: string, options: ICommonObject): Promise<any> {
         const temperature = nodeData.inputs?.temperature as string
         const modelName = nodeData.inputs?.modelName as string
@@ -153,7 +151,9 @@ class OpenAI_LLMs implements INode {
         const credentialData = await getCredentialData(nodeData.credential ?? '', options)
         const openAIApiKey = getCredentialParam('openAIApiKey', credentialData, nodeData)
 
-        const obj: Partial<OpenAIInput> & { openAIApiKey?: string } = {
+        const cache = nodeData.inputs?.cache as BaseCache
+
+        const obj: Partial<OpenAIInput> & BaseLLMParams & { openAIApiKey?: string } = {
             temperature: parseFloat(temperature),
             modelName,
             openAIApiKey,
@@ -168,8 +168,9 @@ class OpenAI_LLMs implements INode {
         if (batchSize) obj.batchSize = parseInt(batchSize, 10)
         if (bestOf) obj.bestOf = parseInt(bestOf, 10)
 
-        let parsedBaseOptions: any | undefined = undefined
+        if (cache) obj.cache = cache
 
+        let parsedBaseOptions: any | undefined = undefined
         if (baseOptions) {
             try {
                 parsedBaseOptions = typeof baseOptions === 'object' ? baseOptions : JSON.parse(baseOptions)

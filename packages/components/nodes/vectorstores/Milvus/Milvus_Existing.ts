@@ -1,9 +1,9 @@
-import { ICommonObject, INode, INodeData, INodeOutputsValue, INodeParams } from '../../../src/Interface'
 import { DataType, ErrorCode } from '@zilliz/milvus2-sdk-node'
-import { MilvusLibArgs, Milvus } from 'langchain/vectorstores/milvus'
-import { Embeddings } from 'langchain/embeddings/base'
+import { MilvusLibArgs, Milvus } from '@langchain/community/vectorstores/milvus'
+import { Embeddings } from '@langchain/core/embeddings'
+import { Document } from '@langchain/core/documents'
 import { getBaseClasses, getCredentialData, getCredentialParam } from '../../../src/utils'
-import { Document } from 'langchain/document'
+import { ICommonObject, INode, INodeData, INodeOutputsValue, INodeParams } from '../../../src/Interface'
 
 class Milvus_Existing_VectorStores implements INode {
     label: string
@@ -13,6 +13,7 @@ class Milvus_Existing_VectorStores implements INode {
     type: string
     icon: string
     category: string
+    badge: string
     baseClasses: string[]
     inputs: INodeParams[]
     credential: INodeParams
@@ -21,12 +22,13 @@ class Milvus_Existing_VectorStores implements INode {
     constructor() {
         this.label = 'Milvus Load Existing collection'
         this.name = 'milvusExistingCollection'
-        this.version = 1.0
+        this.version = 2.0
         this.type = 'Milvus'
         this.icon = 'milvus.svg'
         this.category = 'Vector Stores'
         this.description = 'Load existing collection from Milvus (i.e: Document has been upserted)'
         this.baseClasses = [this.type, 'VectorStoreRetriever', 'BaseRetriever']
+        this.badge = 'DEPRECATING'
         this.credential = {
             label: 'Connect Credential',
             name: 'credential',
@@ -50,6 +52,25 @@ class Milvus_Existing_VectorStores implements INode {
                 label: 'Milvus Collection Name',
                 name: 'milvusCollection',
                 type: 'string'
+            },
+            {
+                label: 'Milvus Filter',
+                name: 'milvusFilter',
+                type: 'string',
+                optional: true,
+                description:
+                    'Filter data with a simple string query. Refer Milvus <a target="_blank" href="https://milvus.io/blog/2022-08-08-How-to-use-string-data-to-empower-your-similarity-search-applications.md#Hybrid-search">docs</a> for more details.',
+                placeholder: 'doc=="a"',
+                additionalParams: true
+            },
+            {
+                label: 'Top K',
+                name: 'topK',
+                description: 'Number of top results to fetch. Default to 4',
+                placeholder: '4',
+                type: 'number',
+                additionalParams: true,
+                optional: true
             }
         ]
         this.outputs = [
@@ -70,6 +91,7 @@ class Milvus_Existing_VectorStores implements INode {
         // server setup
         const address = nodeData.inputs?.milvusServerUrl as string
         const collectionName = nodeData.inputs?.milvusCollection as string
+        const milvusFilter = nodeData.inputs?.milvusFilter as string
 
         // embeddings
         const embeddings = nodeData.inputs?.embeddings as Embeddings
@@ -109,7 +131,7 @@ class Milvus_Existing_VectorStores implements INode {
                 throw new Error(`Collection not found: ${vectorStore.collectionName}, please create collection before search.`)
             }
 
-            const filterStr = filter ?? ''
+            const filterStr = milvusFilter ?? filter ?? ''
 
             await vectorStore.grabCollectionFields()
 
